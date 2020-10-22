@@ -47,7 +47,7 @@ cpdef object binary_find(object arr, object els):
 
 
 @cython.boundscheck(False)
-cdef void compute_reach_kernel(float qup, float quc, int nreach, const float[:,:] input_buf, float[:, :] output_buf) nogil:
+cpdef void compute_reach_kernel(float qup, float quc, int nreach, const float[:,:] input_buf, float[:, :] output_buf) nogil:
     """
     Kernel to compute reach.
 
@@ -173,7 +173,7 @@ cpdef object compute_network(int nsteps, list reaches, object connections,
     cdef:
         Py_ssize_t[:] srows  # Source rows indexes
         Py_ssize_t[:] drows_tmp
-        Py_ssize_t[:] usrows # Upstream row indexes 
+        # Py_ssize_t[:] usrows # Upstream row indexes 
     
     # Buffers and buffer views
     # These are C-contiguous.
@@ -205,7 +205,7 @@ cpdef object compute_network(int nsteps, list reaches, object connections,
 
     cdef int reachlen, usreachlen
     cdef Py_ssize_t bidx
-    cdef list buf_cache = []
+    # cdef list buf_cache = []
 
     cdef:
         Py_ssize_t[:] reach_cache
@@ -240,8 +240,6 @@ cpdef object compute_network(int nsteps, list reaches, object connections,
             for bidx in binary_find(parameter_idx, connections[reach[0]]):
                 usreach_cache[iusreach_cache] = bidx
                 iusreach_cache += 1
-    
-    print("reach cache = ", np.asarray(reach_cache))
     
     # James's suspisin !!!!!
     # many of the reaches will not write enough to overwrite all of the buf initalization values
@@ -313,14 +311,14 @@ cpdef object compute_network(int nsteps, list reaches, object connections,
                     compute_reach_kernel(qup, quc, reachlen, buf_view, out_view)
                     
                     # print parameters handed to compute_reach_kernel, for the 0th index (segment) of the parameter dataframe
-                    with gil:
-                        idx_n = 2
-                        ts = 1
-                        if timestep == ts and idx_n in srows:
-                            for i, s in enumerate(srows):
-                                if s == idx_n:
-                                    print("inputs = ",np.asarray(buf_view[drows[i],:]))
-                                    print("results = ",np.asarray(out_view[drows[i],:]))
+#                     with gil:
+#                         idx_n = 2
+#                         ts = 1
+#                         if timestep == ts and idx_n in srows:
+#                             for i, s in enumerate(srows):
+#                                 if s == idx_n:
+#                                     print("inputs = ",np.asarray(buf_view[drows[i],:]))
+#                                     print("results = ",np.asarray(out_view[drows[i],:]))
 
                     # copy out_buf results back to flowdepthvel
                     for i in range(3):
@@ -333,3 +331,170 @@ cpdef object compute_network(int nsteps, list reaches, object connections,
             timestep += 1
 
     return np.asarray(parameter_idx, dtype=np.intp), np.asarray(flowveldepth, dtype='float32')
+
+
+cpdef object compute_network_original(int nsteps, list reaches, dict connections, 
+    const long[:] data_idx, object[:] data_cols, const float[:,:] data_values, 
+    const float[:, :] qlat_values,
+    # const float[:] wbody_idx, object[:] wbody_cols, const float[:, :] wbody_vals,
+    bint assume_short_ts=False):
+    """
+    Compute network
+    Args:
+        nsteps (int): number of time steps
+        reaches (list): List of reaches
+        connections (dict): Network
+        data_idx (ndarray): a 1D sorted index for data_values
+        data_values (ndarray): a 2D array of data inputs (nodes x variables)
+        qlats (ndarray): a 2D array of qlat values (nodes x nsteps). The index must be shared with data_values
+        assume_short_ts (bool): Assume short time steps (quc = qup)
+    Notes:
+        Array dimensions are checked as a precondition to this method.
+    """
+    # Check shapes
+    if qlat_values.shape[0] != data_idx.shape[0] or qlat_values.shape[1] != nsteps:
+        raise ValueError(f"Qlat shape is incorrect: expected ({data_idx.shape[0], nsteps}), got ({qlat_values.shape[0], qlat_values.shape[1]})")
+    if data_values.shape[0] != data_idx.shape[0] or data_values.shape[1] != data_cols.shape[0]:
+        raise ValueError(f"data_values shape mismatch")
+
+    # flowveldepth is 2D float array that holds results
+    # columns: flow (qdc), velocity (velc), and depth (depthc) for each timestep
+    # rows: indexed by data_idx
+    cdef float[:,::1] flowveldepth = np.zeros((data_idx.shape[0], nsteps * 3), dtype='float32')
+
+    cdef:
+        Py_ssize_t[:] srows  # Source rows indexes
+        Py_ssize_t[:] drows_tmp
+        # Py_ssize_t[:] usrows # Upstream row indexes 
+    
+    # Buffers and buffer views
+    # These are C-contiguous.
+    cdef float[:, ::1] buf, buf_view
+    cdef float[:, ::1] out_buf, out_view
+
+    # Source columns
+    cdef Py_ssize_t[:] scols = np.array(column_mapper(data_cols), dtype=np.intp)
+    
+    # hard-coded column. Find a better way to do this
+    cdef int buf_cols = 13
+
+    cdef:
+        Py_ssize_t i  # Temporary variable
+        Py_ssize_t ireach  # current reach index
+        Py_ssize_t ireach_cache  # current index of reach cache
+        Py_ssize_t iusreach_cache  # current index of upstream reach cache
+
+    # Measure length of all the reaches
+    cdef list reach_sizes = list(map(len, reaches))
+    # For a given reach, get number of upstream nodes
+    cdef list usreach_sizes = [len(connections.get(reach[0], ())) for reach in reaches]
+    
+    cdef:
+        list reach  # Temporary variable
+        list bf_results  # Temporary variable
+
+    cdef int reachlen, usreachlen
+    cdef Py_ssize_t bidx
+    # cdef list buf_cache = []
+
+    cdef:
+        Py_ssize_t[:] reach_cache
+        Py_ssize_t[:] usreach_cache
+
+    # reach cache is ordered 1D view of reaches
+    # [-len, item, item, item, -len, item, item, -len, item, item, ...]
+    reach_cache = np.empty(sum(reach_sizes) + len(reach_sizes), dtype=np.intp)
+    # upstream reach cache is ordered 1D view of reaches
+    # [-len, item, item, item, -len, item, item, -len, item, item, ...]
+    usreach_cache = np.empty(sum(usreach_sizes) + len(usreach_sizes), dtype=np.intp)
+
+    ireach_cache = 0
+    iusreach_cache = 0
+    # copy reaches into an array
+    for ireach in range(len(reaches)):
+        reachlen = reach_sizes[ireach]
+        usreachlen = usreach_sizes[ireach]
+        reach = reaches[ireach]
+
+        # set the length (must be negative to indicate reach boundary)
+        reach_cache[ireach_cache] = -reachlen
+        ireach_cache += 1
+        bf_results = binary_find(data_idx, reach)
+        for bidx in bf_results:
+            reach_cache[ireach_cache] = bidx
+            ireach_cache += 1
+
+        usreach_cache[iusreach_cache] = -usreachlen
+        iusreach_cache += 1
+        if usreachlen > 0:
+            for bidx in binary_find(data_idx, connections[reach[0]]):
+                usreach_cache[iusreach_cache] = bidx
+                iusreach_cache += 1        
+    
+    cdef int maxreachlen = max(reach_sizes)
+    buf = np.empty((maxreachlen, buf_cols), dtype='float32')
+    out_buf = np.empty((maxreachlen, 3), dtype='float32')
+
+    drows_tmp = np.arange(maxreachlen, dtype=np.intp)
+    cdef Py_ssize_t[:] drows
+    cdef float qup, quc
+    cdef int timestep = 0
+    cdef int ts_offset
+
+    with nogil:
+        while timestep < nsteps:
+            ts_offset = timestep * 3
+
+            ireach_cache = 0
+            iusreach_cache = 0
+            while ireach_cache < reach_cache.shape[0]:
+                
+                reachlen = -reach_cache[ireach_cache]
+                usreachlen = -usreach_cache[iusreach_cache]
+
+                ireach_cache += 1
+                iusreach_cache += 1
+                #print(ireach_cache, iusreach_cache, np.asarray(reach_cache, dtype=np.intp), np.asarray(usreach_cache, dtype=np.intp))
+
+                qup = 0.0
+                quc = 0.0
+                for i in range(usreachlen):
+                    quc += flowveldepth[usreach_cache[iusreach_cache + i], ts_offset]
+                    if timestep > 0:
+                        qup += flowveldepth[usreach_cache[iusreach_cache + i], ts_offset - 3]
+
+                buf_view = buf[:reachlen, :]
+                out_view = out_buf[:reachlen, :]
+                drows = drows_tmp[:reachlen]
+                srows = reach_cache[ireach_cache:ireach_cache+reachlen]
+
+                fill_buffer_column(srows, timestep, drows, 0, qlat_values, buf_view)
+                for i in range(scols.shape[0]):
+                        fill_buffer_column(srows, scols[i], drows, i + 1, data_values, buf_view)
+                    # fill buffer with qdp, depthp, velp
+                if timestep > 0:
+                    fill_buffer_column(srows, ts_offset - 3, drows, 10, flowveldepth, buf_view)
+                    fill_buffer_column(srows, ts_offset - 2, drows, 11, flowveldepth, buf_view)
+                    fill_buffer_column(srows, ts_offset - 1, drows, 12, flowveldepth, buf_view)
+                else:
+                    # fill buffer with constant
+                    for i in range(drows.shape[0]):
+                        buf_view[drows[i], 10] = 0.0
+                        buf_view[drows[i], 11] = 0.0
+                        buf_view[drows[i], 12] = 0.0
+
+                if assume_short_ts:
+                    quc = qup             
+                
+                compute_reach_kernel(qup, quc, reachlen, buf_view, out_view)
+                
+                # copy out_buf results back to flowdepthvel
+                for i in range(3):
+                    fill_buffer_column(drows, i, srows, ts_offset + i, out_view, flowveldepth)
+
+                # Update indexes to point to next reach
+                ireach_cache += reachlen
+                iusreach_cache += usreachlen
+                
+            timestep += 1
+    return np.asarray(data_idx, dtype=np.intp), np.asarray(flowveldepth, dtype='float32')
