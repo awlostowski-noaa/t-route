@@ -5,6 +5,17 @@ cimport cython
 cimport numpy as np
 
 @cython.boundscheck(False)
+cpdef void fill_buffer_column(const Py_ssize_t[:] srows,
+    const Py_ssize_t scol,
+    const Py_ssize_t[:] drows,
+    const Py_ssize_t dcol,
+    const float[:, :] src, float[:, ::1] out) nogil:
+
+    cdef Py_ssize_t i
+    for i in range(srows.shape[0]):
+        out[drows[i], dcol] = src[srows[i], scol]
+
+@cython.boundscheck(False)
 cpdef Py_ssize_t bisect_left_long(const long[:] arr, long el) nogil:
     cdef Py_ssize_t L = 0
     cdef Py_ssize_t R = len(arr) - 1
@@ -40,7 +51,6 @@ cpdef Py_ssize_t bisect_left(object arr, object el):
             return m
     return -1
 
-
 @cython.boundscheck(False)
 cpdef list binary_find(object arr, object els):
     """
@@ -62,7 +72,6 @@ cpdef list binary_find(object arr, object els):
         else:
             raise ValueError(f"element {el} not found in {np.asarray(arr)}")
     return idxs
-
 
 @cython.boundscheck(False)
 cpdef Py_ssize_t[:,:] build_upstream_graph(object rconnections, const long[:] data_index):
