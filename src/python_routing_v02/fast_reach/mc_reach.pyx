@@ -339,6 +339,8 @@ cpdef object compute_network(int nsteps, list reaches, dict connections,
 #---------------------------------------------------------------------------------------------------------------#
 #---------------------------------------------------------------------------------------------------------------#
 #---------------------------------------------------------------------------------------------------------------#
+# mt_opt PR goal - profile and optimize multithreaded routine
+
 cpdef object compute_network_multithread(int nsteps, list reaches, dict connections, 
     const long[:] data_idx, object[:] data_cols, const float[:,:] data_values, 
     const float[:, :] qlat_values, const float[:,:] initial_conditions, 
