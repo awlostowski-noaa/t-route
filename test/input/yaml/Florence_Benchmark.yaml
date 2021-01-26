@@ -11,6 +11,7 @@ run_parameters:
     dt: 300
     nts: 8640
     cpu-pool: 12
+    return_courant: true
     #Use the parallel computation engine (omit flag for serial computation)
     #Verbose output (leave blank for quiet output)
     #Set the showtiming (omit flag for no timing information)
@@ -31,7 +32,7 @@ output_parameters:
     nc_output_folder: "../../test/output/text"
 #data column assignment inside supernetwork_parameters
 supernetwork_parameters:
-    title_string: Custom Input Example (using Florence-Event Cutout datafile)
+    title_string: "Florence_TEST"
     geo_file_path: "../../test/input/florence_933020089/DOMAIN/Route_Link.nc"
     mask_file_path: "../../test/input/geo/Channels/masks/933020089_mask.csv"
     mask_layer_string: ""
