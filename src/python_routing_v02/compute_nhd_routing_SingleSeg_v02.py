@@ -916,7 +916,7 @@ def main():
     if showtiming:
         print("... in %s seconds." % (time.time() - start_time))
 
-    if "parity_check_input_folder" in parity_parameters:
+    if "parity_check_input_folder" in parity_parameters or "parity_check_file" in parity_parameters:
 
         if verbose:
             print(
