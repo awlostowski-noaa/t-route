@@ -104,5 +104,5 @@ parity_parameters:
 #     parity_check_file_pattern_filter: "/201809*.CHRTOUT_DOMAIN1"
 #     parity_check_file_index_col: feature_id
 #     parity_check_file_value_col: streamflow
-    parity_check_compare_node: 8777701
+    parity_check_compare_node: 933020089
 
