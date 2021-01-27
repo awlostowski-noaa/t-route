@@ -87,7 +87,7 @@ def get_network_data(network_name):
 
     # Load network meta data for the Cape Fear Basin
     supernetwork = network_name
-    network_data = nnu.set_supernetwork_data(
+    network_data = nnu.set_supernetwork_parameters(
         supernetwork=supernetwork, geo_input_folder=geo_input_folder
     )
 
@@ -104,7 +104,7 @@ def get_network_data(network_name):
     # GET THE STRAHLER ORDER DATA TOO!
     cols.append("order")
 
-    data = nhd_io.read(network_data["geo_file_path"])
+    data = nhd_io.read(network_data["geo_file_path"])    
     data = data[cols]
     data = data.set_index(network_data["columns"]["key"])
 
@@ -858,6 +858,10 @@ def main():
     # save RouteLink data as shapefile
     RouteLink_edit = RouteLink_edit.drop(columns=["time", "gages"])
     RouteLink_edit.to_file(os.path.join(dir_path, filename))
+    
+    # save RouteLink data as netCDF
+    RouteLink_edit_xr = xr.Dataset.from_dataframe(RouteLink_edit)
+    RouteLink_edit_xr.to_netcdf(os.path.join(root, "test", "input", "geo", "Channels", filename))
 
     # save cross walk as json
     print(
