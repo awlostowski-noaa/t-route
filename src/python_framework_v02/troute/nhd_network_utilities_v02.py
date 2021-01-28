@@ -318,9 +318,23 @@ def set_supernetwork_parameters(
         )
         rv.update(
             {
-                "title_string": "Hurricane Florence Domain, near Durham NC",  # overwrites other title...
+                "geo_file_path": os.path.join(
+                    "test",
+                    "input",
+                    "florence_933020089",
+                    "DOMAIN", 
+                    "Route_Link.nc",
+                ),
+                "waterbody_parameter_file_path": os.path.join(
+                    "test",
+                    "input",
+                    "florence_933020089",
+                    "DOMAIN", 
+                    "LAKEPARM.nc",
+                ),
+                "title_string": "Hurricane Florence Domain, Falls Lake, near Durham NC",  # overwrites other title...
                 "mask_file_path": os.path.join(
-                    geo_input_folder, "Channels", "masks", "Florence_FULL_RES.txt",
+                    geo_input_folder, "Channels", "masks", "933020089_mask.csv",
                 ),
                 "mask_driver_string": "csv",
                 "mask_layer_string": "",
