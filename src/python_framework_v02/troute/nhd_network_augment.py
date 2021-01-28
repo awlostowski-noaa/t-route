@@ -108,7 +108,7 @@ def get_network_data(network_name):
     data = data[cols]
     data = data.set_index(network_data["columns"]["key"])
 
-    # mask NHDNetwork to isolate test network - full resolution Cape Fear basin, NC
+    # mask NHDNetwork to isolate test network
     if "mask_file_path" in network_data:
         data_mask = nhd_io.read_mask(
             network_data["mask_file_path"],
@@ -123,7 +123,6 @@ def get_network_data(network_name):
     data = nhd_io.replace_downstreams(data, network_data["columns"]["downstream"], 0)
 
     return data, RouteLink, network_data
-
 
 def network_connections(data, network_data):
 
