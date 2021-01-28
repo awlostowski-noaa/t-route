@@ -1,6 +1,6 @@
 import json
 import os
-
+from pathlib import Path
 import glob
 import pandas as pd
 from functools import partial
@@ -316,18 +316,20 @@ def set_supernetwork_parameters(
         rv = set_supernetwork_parameters(
             supernetwork="CONUS_FULL_RES_v20", geo_input_folder=geo_input_folder
         )
+        
+        geo_path_parts = Path(geo_input_folder).parts
+        test_input_folder = os.path.join(*Path(geo_input_folder).parts[:len(geo_path_parts)-1])
+        
         rv.update(
             {
                 "geo_file_path": os.path.join(
-                    "test",
-                    "input",
+                    test_input_folder,
                     "florence_933020089",
                     "DOMAIN", 
                     "Route_Link.nc",
                 ),
                 "waterbody_parameter_file_path": os.path.join(
-                    "test",
-                    "input",
+                    test_input_folder,
                     "florence_933020089",
                     "DOMAIN", 
                     "LAKEPARM.nc",
