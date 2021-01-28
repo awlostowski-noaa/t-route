@@ -744,17 +744,16 @@ def main():
     RouteLink = RouteLink.set_index(network_data["columns"]["key"])
 
     pruned_segs = []
-    # prune headwaters
+    
+    #-------------------------------
+    # PRUNE - SNAP - MERGE
+    #-------------------------------
     if prune and snap:
         dirname = (
-            "RouteLink_" + supernetwork + "_" + str(threshold) + "m_prune_snap_merge"
-        )
-        filename = (
             "RouteLink_"
             + supernetwork
-            + "_"
-            + str(threshold)
-            + "m_prune_snap_merge.shp"
+            + "_" + str(threshold)
+            + "m_prune_snap_merge"
         )
         filename_cw = (
             "CrossWalk_"
@@ -779,13 +778,23 @@ def main():
             data, data_snapped, network_data, threshold, pruned_segs
         )
 
+    #-------------------------------
+    #      SNAP - MERGE
+    #-------------------------------
     if snap and not prune:
-        dirname = "RouteLink_" + supernetwork + "_" + str(threshold) + "m_snap_merge"
-        filename = (
-            "RouteLink_" + supernetwork + "_" + str(threshold) + "m_snap_merge.shp"
+        dirname = (
+            "RouteLink_"
+            + supernetwork
+            + "_"
+            + str(threshold)
+            + "m_snap_merge"
         )
         filename_cw = (
-            "CrossWalk_" + supernetwork + "_" + str(threshold) + "m_snap_merge.json"
+            "CrossWalk_" + 
+            supernetwork + 
+            "_" + 
+            str(threshold) + 
+            "m_snap_merge.json"
         )
 
         print("Snap and merge:")
@@ -797,13 +806,23 @@ def main():
             data, data_snapped, network_data, threshold, pruned_segs
         )
 
+    #-------------------------------
+    #      PRUNE - MERGE
+    #-------------------------------
     if not snap and prune:
-        dirname = "RouteLink_" + supernetwork + "_" + str(threshold) + "m_prune_merge"
-        filename = (
-            "RouteLink_" + supernetwork + "_" + str(threshold) + "m_prune_merge.shp"
+        dirname = (
+            "RouteLink_"
+            + supernetwork
+            + "_"
+            + str(threshold)
+            + "m_prune_merge"
         )
         filename_cw = (
-            "CrossWalk_" + supernetwork + "_" + str(threshold) + "m_prune_merge.json"
+            "CrossWalk_"
+            + supernetwork
+            + "_"
+            + str(threshold)
+            + "m_prune_merge.json"
         )
 
         print("Prune and merge:")
@@ -815,90 +834,69 @@ def main():
             data, data_snapped, network_data, threshold, pruned_segs
         )
 
+    #-------------------------------
+    #         MERGE
+    #-------------------------------
     if not snap and not prune:
-        dirname = "RouteLink_" + supernetwork + "_" + str(threshold) + "m_merge"
-        filename = "RouteLink_" + supernetwork + "_" + str(threshold) + "m_merge.nc"
+        dirname = (
+            "RouteLink_"
+            + supernetwork
+            + "_"
+            + str(threshold)
+            + "m_merge"
+                  )
         filename_cw = (
-            "CrossWalk_" + supernetwork + "_" + str(threshold) + "m_merge.json"
+            "CrossWalk_"
+            + supernetwork
+            + "_"
+            + str(threshold)
+            + "m_merge.json"
         )
+        
         print("Just merge:")
         print("merging segments...")
         data_merged, qlat_destinations = segment_merge(
             data, data, network_data, threshold, pruned_segs
         )
 
-    # update RouteLink data
+    # write a new *edited* RouteLink DataFrame
     RouteLink_edit = RouteLink.loc[data_merged.index.values]
-
+    # replace parameters
     for (columnName, columnData) in data_merged.iteritems():
         RouteLink_edit.loc[:, columnName] = columnData
-
+    # replace "to"
     for idx in RouteLink_edit.index:
         if RouteLink_edit.loc[idx, "to"] < 0:
             RouteLink_edit.loc[idx, "to"] = 0
 
-    # convert RouteLink to geodataframe
-    RouteLink_edit = gpd.GeoDataFrame(
-        RouteLink_edit,
-        geometry=gpd.points_from_xy(RouteLink_edit.lon, RouteLink_edit.lat),
-    )
-
     # export merged data
     print(
-        "exporting RouteLink file:",
-        filename,
+        "exporting RouteLink DataFrame:",
+        dirname + ".pkl",
         "to",
-        os.path.join(root, "test", "input", "geo", "Channels"),
+        os.path.join(root, "test", "input", "geo", "Channels", dirname),
     )
 
     dir_path = os.path.join(root, "test", "input", "geo", "Channels", dirname)
     if not os.path.isdir(dir_path):
         os.mkdir(dir_path)
 
-    # save RouteLink data as shapefile
-    RouteLink_edit = RouteLink_edit.drop(columns=["time", "gages"])
-    RouteLink_edit.to_file(os.path.join(dir_path, filename))
-    
-    # save RouteLink data as netCDF
-    RouteLink_edit_xr = xr.Dataset.from_dataframe(RouteLink_edit)
-    RouteLink_edit_xr.to_netcdf(os.path.join(root, "test", "input", "geo", "Channels", filename))
+    # save RouteLink data as pickle
+    pd.DataFrame(RouteLink_edit).to_pickle(os.path.join(root, "test", "input", "geo", "Channels", dirname, dirname + ".pkl"))
 
     # save cross walk as json
     print(
         "exporting CrossWalk file:",
         filename_cw,
         "to",
-        os.path.join(root, "test", "input", "geo", "Channels"),
+        os.path.join(root, "test", "input", "geo", "Channels", dirname),
     )
     with open(os.path.join(dir_path, filename_cw), "w") as outfile:
         json.dump(qlat_destinations, outfile)
 
     # export original data
     if return_original:
-        dirname = "RouteLink_" + supernetwork
-        filename = "RouteLink_" + supernetwork + ".shp"
-        print(
-            "exporting unmodified RouteLink file:",
-            filename,
-            "to",
-            os.path.join(root, "test", "input", "geo", "Channels"),
-        )
-
-        dir_path = os.path.join(root, "test", "input", "geo", "Channels", dirname)
-        if not os.path.isdir(dir_path):
-            os.mkdir(dir_path)
-
-        RouteLink_domain = RouteLink.loc[data.index.values]
-        RouteLink_domain = gpd.GeoDataFrame(
-            RouteLink_domain,
-            geometry=gpd.points_from_xy(RouteLink_domain.lon, RouteLink_domain.lat),
-        )
-
-        RouteLink_domain = RouteLink_domain.drop(columns=["time", "gages"])
-        RouteLink_domain.to_file(os.path.join(dir_path, filename))
-
-    print("Number of segments in modified RouteLink:", len(RouteLink_edit))
-    print("Number of segments in original RouteLink:", len(RouteLink_domain))
+        RouteLink.loc[data.index.values].to_pickle(os.path.join(root, "test", "input", "geo", "Channels", dirname, supernetwork + ".pkl"))
 
 
 if __name__ == "__main__":
