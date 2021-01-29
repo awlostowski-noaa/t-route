@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import glob
 import pandas as pd
+import numpy as np
 from functools import partial
 import troute.nhd_io as nhd_io
 import troute.nhd_network as nhd_network
@@ -415,7 +416,10 @@ def build_connections(supernetwork_parameters, dt):
     
     cols = supernetwork_parameters["columns"]
     
-    if supernetwork_parameters.get("route_link_pickle", None):
+    if supernetwork_parameters.get("run_augmented_network", None) == True:
+        param_df = pd.read_pickle(supernetwork_parameters["augment_routelink"])
+        param_df = param_df.reset_index()
+    elif supernetwork_parameters.get("route_link_pickle", None):
         param_df = pd.read_pickle(supernetwork_parameters["route_link_pickle"])
         param_df = param_df.reset_index()
     else:    
@@ -491,7 +495,7 @@ def build_channel_initial_state(restart_parameters, channel_index=None):
     return q0
 
 
-def build_qlateral_array(forcing_parameters, connections_keys, nts):
+def build_qlateral_array(forcing_parameters, supernetwork_parameters, connections_keys, nts):
     # TODO: set default/optional arguments
 
     qlat_input_folder = forcing_parameters.get("qlat_input_folder", None)
@@ -511,14 +515,6 @@ def build_qlateral_array(forcing_parameters, connections_keys, nts):
             value_col=qlat_file_value_col,
         )
 
-        qlat_df = qlat_df[qlat_df.index.isin(connections_keys)]
-
-    # TODO: These four lines seem extraneous
-    #    df_length = len(qlat_df.columns)
-    #    for x in range(df_length, 144):
-    #        qlat_df[str(x)] = 0
-    #        qlat_df = qlat_df.astype("float32")
-
     elif qlat_input_file:
         qlat_df = nhd_io.get_ql_from_csv(qlat_input_file)
 
@@ -527,5 +523,35 @@ def build_qlateral_array(forcing_parameters, connections_keys, nts):
         qlat_df = pd.DataFrame(
             qlat_const, index=connections_keys, columns=range(nts), dtype="float32",
         )
+    
+    if supernetwork_parameters.get("run_augmented_network", None) == True:
+        
+        # load cross walk
+        with open(supernetwork_parameters["cross_walk"]) as f:
+            cw = json.load(f)
+        
+        # append qlateral flows using cross walk file
+        qlat_aug = qlat_df.copy()
+        for cut, dest in cw.items():
+
+            dest_fix = dest.replace('[', '')
+            dest_fix = dest_fix.replace(']', '')
+
+            qlat_aug.loc[int(dest_fix),:] = qlat_aug.loc[int(dest_fix),:] + qlat_df.loc[int(cut),:]
+            qlat_aug = qlat_aug.drop(int(cut))
+        
+        # mass balance check
+        if np.isclose(qlat_df.sum().sum(),qlat_aug.sum().sum()):
+            print("Q lateral data adjusted per CrossWalk file, mass balances!")
+        else:
+            print("Alert - Q lateral mass does not balance after CrossWalk adjustment")
+            print("sum qlat_df:", round(qlat_df.sum().sum(),2))
+            print("sum qlat_aug:", round(qlat_aug.sum().sum(),2))
+        
+        # return the updated qlateral data
+        qlat_df = qlat_aug.copy()
+        
+    # mask qlat file
+    qlat_df = qlat_df[qlat_df.index.isin(connections_keys)]
 
     return qlat_df
