@@ -56,6 +56,7 @@ supernetwork_parameters:
     terminal_code: 0
     driver_string: NetCDF
     layer_string: 0
+    route_link_pickle: "../../test/input/geo/Channels/RouteLink_Florence_FULL_RES_500m_merge/Florence_FULL_RES.pkl"
 #waterbody parameters and assignments from lake parm file
 waterbody_parameters:
     level_pool:
@@ -104,5 +105,5 @@ parity_parameters:
 #     parity_check_file_pattern_filter: "/201809*.CHRTOUT_DOMAIN1"
 #     parity_check_file_index_col: feature_id
 #     parity_check_file_value_col: streamflow
-    parity_check_compare_node: 933020089
+    parity_check_compare_node: 8777701
 
