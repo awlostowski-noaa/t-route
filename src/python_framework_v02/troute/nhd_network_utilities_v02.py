@@ -417,6 +417,7 @@ def build_connections(supernetwork_parameters, dt):
     
     if supernetwork_parameters.get("route_link_pickle", None):
         param_df = pd.read_pickle(supernetwork_parameters["route_link_pickle"])
+        param_df = param_df.reset_index()
     else:    
         param_df = nhd_io.read(supernetwork_parameters["geo_file_path"])
 
