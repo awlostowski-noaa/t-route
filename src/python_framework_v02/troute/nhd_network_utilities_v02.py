@@ -412,9 +412,13 @@ def reverse_dict(d):
 
 def build_connections(supernetwork_parameters, dt):
     # TODO: Remove the dependence on dt in this function
-
+    
     cols = supernetwork_parameters["columns"]
-    param_df = nhd_io.read(supernetwork_parameters["geo_file_path"])
+    
+    if supernetwork_parameters.get("route_link_pickle", None):
+        param_df = pd.read_pickle(supernetwork_parameters["route_link_pickle"])
+    else:    
+        param_df = nhd_io.read(supernetwork_parameters["geo_file_path"])
 
     param_df = param_df[list(cols.values())]
     param_df = param_df.set_index(cols["key"])
@@ -427,7 +431,7 @@ def build_connections(supernetwork_parameters, dt):
         param_df = param_df.filter(
             data_mask.iloc[:, supernetwork_parameters["mask_key"]], axis=0
         )
-
+    
     param_df = param_df.sort_index()
     param_df = nhd_io.replace_downstreams(param_df, cols["downstream"], 0)
 
