@@ -57,6 +57,10 @@ supernetwork_parameters:
     driver_string: NetCDF
     layer_string: 0
     route_link_pickle: "../../test/input/geo/Channels/RouteLink_Florence_FULL_RES_500m_merge/Florence_FULL_RES.pkl"
+    run_augmented_network: True
+    native_routelink: "../../test/input/geo/Channels/RouteLink_Florence_FULL_RES_500m_merge/Florence_FULL_RES.pkl"
+    augment_routelink: "../../test/input/geo/Channels/RouteLink_Florence_FULL_RES_500m_merge/RouteLink_Florence_FULL_RES_500m_merge.pkl"
+    cross_walk: "../../test/input/geo/Channels/RouteLink_Florence_FULL_RES_500m_merge/CrossWalk_Florence_FULL_RES_500m_merge.json"
 #waterbody parameters and assignments from lake parm file
 waterbody_parameters:
     level_pool:
@@ -106,4 +110,6 @@ parity_parameters:
 #     parity_check_file_index_col: feature_id
 #     parity_check_file_value_col: streamflow
     parity_check_compare_node: 8777701
+
+    
 
