@@ -27,7 +27,7 @@ output_parameters:
     #output location for csv file 
     csv_output:
         csv_output_folder: "../../test/output/text"
-        csv_output_segments: [4185713, 2743396, 4153198, 4186293, 4186169]
+        csv_output_segments: [933020089]
     #out location for nc file
     nc_output_folder: "../../test/output/text"
 #data column assignment inside supernetwork_parameters
@@ -35,7 +35,7 @@ supernetwork_parameters:
     title_string: "Florence_TEST"
     geo_file_path: "../../test/input/florence_933020089/DOMAIN/Route_Link.nc"
     mask_file_path: "../../test/input/geo/Channels/masks/933020089_mask.csv"
-    mask_layer_string: ""
+    mask_layer_string: None
     mask_driver_string: "csv"
     mask_key: 0
     columns:
@@ -56,8 +56,8 @@ supernetwork_parameters:
     terminal_code: 0
     driver_string: NetCDF
     layer_string: 0
-    route_link_pickle: "../../test/input/geo/Channels/RouteLink_Florence_FULL_RES_500m_merge/Florence_FULL_RES.pkl"
-    run_augmented_network: True
+    #route_link_pickle: "../../test/input/geo/Channels/RouteLink_Florence_FULL_RES_500m_merge/Florence_FULL_RES.pkl"
+    run_augmented_network: False
     native_routelink: "../../test/input/geo/Channels/RouteLink_Florence_FULL_RES_500m_merge/Florence_FULL_RES.pkl"
     augment_routelink: "../../test/input/geo/Channels/RouteLink_Florence_FULL_RES_500m_merge/RouteLink_Florence_FULL_RES_500m_merge.pkl"
     cross_walk: "../../test/input/geo/Channels/RouteLink_Florence_FULL_RES_500m_merge/CrossWalk_Florence_FULL_RES_500m_merge.json"
@@ -103,13 +103,9 @@ restart_parameters:
     #WRF-Hydro waterbody crosswalk filter file
     wrf_hydro_waterbody_crosswalk_filter_file: "../../test/input/florence_933020089/DOMAIN/Route_Link.nc"
     wrf_hydro_waterbody_crosswalk_filter_file_field_name: NHDWaterbodyComID
-parity_parameters:
-    parity_check_file: "../../test/input/florence_933020089/OUTPUT/SeptemberFlorenceStreamflow_wDates.csv" 
-#     parity_check_input_folder: "../../test/input/florence_933020089/Full_Model_Run/OUTPUT/"
-#     parity_check_file_pattern_filter: "/201809*.CHRTOUT_DOMAIN1"
-#     parity_check_file_index_col: feature_id
-#     parity_check_file_value_col: streamflow
-    parity_check_compare_node: 8777701
+# parity_parameters:
+#    parity_check_file: "../../test/input/florence_933020089/OUTPUT/SeptemberFlorenceStreamflow_wDates.csv" 
+#    parity_check_compare_node: 933020162
 
     
 
