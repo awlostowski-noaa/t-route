@@ -781,7 +781,7 @@ def main():
 
     # STEP 1: Build basic network connections graph
     connections, wbodies, param_df = nnu.build_connections(supernetwork_parameters, dt)
-
+    
     if verbose:
         print("supernetwork connections set complete")
     if showtiming:
@@ -808,7 +808,12 @@ def main():
     if verbose:
         print("setting channel initial states ...")
 
-    q0 = nnu.build_channel_initial_state(restart_parameters, param_df.index)
+    if restart_parameters.get("hydro_restart_csv", None):
+        q0 = pd.read_csv(restart_parameters["hydro_restart_csv"])
+        q0 = q0.set_index('link')
+        q0 = q0.astype('float32')
+    else:
+        q0 = nnu.build_channel_initial_state(restart_parameters, param_df.index)
 
     if verbose:
         print("channel initial states complete")
@@ -822,7 +827,7 @@ def main():
     if verbose:
         print("creating qlateral array ...")
 
-    qlats = nnu.build_qlateral_array(forcing_parameters, connections.keys(), nts)
+    qlats = nnu.build_qlateral_array(forcing_parameters, supernetwork_parameters, connections.keys(), nts)    
 
     if verbose:
         print("qlateral array complete")
@@ -865,28 +870,40 @@ def main():
     if output_parameters["csv_output"]:
         csv_output_folder = output_parameters["csv_output"].get("csv_output_folder", None)
         
+    # NOTE:
+    # if writing a very short timestep simulation, maybe dont write-out ALL of the timesteps. Only those that align with the 5min sims
     if (debuglevel <= -1) or output_parameters["csv_output"]:
         
+#         qvd_columns = pd.MultiIndex.from_product(
+#             [range(nts), ["q", "v", "d"]]
+#         ).to_flat_index()
+
         qvd_columns = pd.MultiIndex.from_product(
-            [range(nts), ["q", "v", "d"]]
+            [range(nts), ["q"]]
         ).to_flat_index()
+
         if run_parameters["return_courant"]: 
             flowveldepth = pd.concat(
-                [pd.DataFrame(d, index=i, columns=qvd_columns) for i, d, c in results],
+                [pd.DataFrame(d[:,::3], index=i, columns=qvd_columns) for i, d, c in results],
                 copy=False,
             )
+        
         else:
             flowveldepth = pd.concat(
-                [pd.DataFrame(d, index=i, columns=qvd_columns) for i, d in results],
+                [pd.DataFrame(d[:,::3], index=i, columns=qvd_columns) for i, d in results],
                 copy=False,
             )
         
         if run_parameters["return_courant"]:
+#             courant_columns = pd.MultiIndex.from_product(
+#                 [range(nts), ["cn", "ck", "X"]]
+#             ).to_flat_index()
             courant_columns = pd.MultiIndex.from_product(
-                [range(nts), ["cn", "ck", "X"]]
+                [range(nts), ["cn"]]
             ).to_flat_index()
+            
             courant = pd.concat(
-                [pd.DataFrame(c, index=i, columns=courant_columns) for i, d, c in results],
+                [pd.DataFrame(c[:,::3], index=i, columns=courant_columns) for i, d, c in results],
                 copy=False,
             )
 
@@ -902,11 +919,43 @@ def main():
             
             output_path = pathlib.Path(csv_output_folder).resolve()
             flowveldepth = flowveldepth.sort_index()
-            flowveldepth.to_csv(output_path.joinpath(filename_fvd))
+            
+            if output_parameters["csv_output"].get("csv_output_segments", None):
+                # only return flow data from specified nodes
+                output_segs = output_parameters["csv_output"]["csv_output_segments"]
+                
+                flows = flowveldepth.loc[output_segs]
+                tsteps = (np.arange(len(flows.columns)) + 1) * dt / (24 * 60 * 60)
+                flows.columns = tsteps
+                flows.to_csv(output_path.joinpath(filename_fvd))
+#                 flowveldepth.loc[output_segs].to_csv(output_path.joinpath(filename_fvd))
+                
+            else:
+                flowveldepth.to_csv(output_path.joinpath(filename_fvd))
             
             if run_parameters["return_courant"]:
-                courant = courant.sort_index()
-                courant.to_csv(output_path.joinpath(filename_courant))
+                
+                # calculate courant metrics
+                cn = courant
+                cn.columns = np.arange(len(cn.columns))
+                violate = cn > 1
+                n_violation = violate.sum(axis = 1).sum()
+                mag_violations = cn.mask(cn <= 1, 0).sum().sum()
+                av_violation = (mag_violations - n_violation)/n_violation
+                pct_violation = (n_violation / cn.size)*100
+                
+                # package metrics in a dataframe
+                d = {'metric': ["n_violation", "av_violation", "pct_violation"],
+                     'value': [n_violation, av_violation, pct_violation]}
+                courant_metrics = pd.DataFrame(data = d)
+                
+                # output to csv
+                courant_metrics.to_csv(output_path.joinpath(filename_courant))
+                
+                
+            # **** Consider exporting lighter versions of Courant and flow data ****
+            # - Do the Courant eval metrics in here, rather than passing heavy dataset
+            # - Pass flows from the single node at which we will compare, rather than ...
             
         if debuglevel <= -1:
             print(flowveldepth)
